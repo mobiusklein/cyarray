@@ -132,6 +132,18 @@ cdef class LongVector(object):
         self.flags |= VectorStateEnum.should_free
         return self.impl == NULL
 
+    cdef int free_storage(self) nogil:
+        free_long_vector(self.impl)
+
+    cdef bint get_should_free(self) nogil:
+        return self.flags & VectorStateEnum.should_free
+
+    cdef void set_should_free(self, bint flag) nogil:
+        self.flags &= VectorStateEnum.should_free * flag
+
+    cdef long* get_data(self) nogil:
+        return self.impl.v
+
     cdef long get(self, size_t i) nogil:
         return self.impl.v[i]
 
@@ -188,7 +200,8 @@ cdef class LongVector(object):
         return dup
 
     def __dealloc__(self):
-        free_long_vector(self.impl)
+        if self.should_free():
+            self.free_storage()
 
     def __len__(self):
         return self.size()

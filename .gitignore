@@ -1,7 +1,7 @@
 .vscode
 build
-*.pyd
-*.so
-*.c
-*.html
-*.pyc
+**.pyd
+**.so
+**.c
+**.html
+**.pyc

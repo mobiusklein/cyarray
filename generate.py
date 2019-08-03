@@ -8,13 +8,13 @@ def fill_in_template(pytype, ctype, title, to_python_func, to_c_func, implementa
     pxd_template = jinja2.Template(open("template.pxd", 'rt').read())
     if implementat_preamble is None:
         implementat_preamble = ''
-    with open("{}_vector.pxd".format(ctype), 'wt') as fh:
+    with open("generated/{}_vector.pxd".format(ctype), 'wt') as fh:
         fh.write(pxd_template.render(
             pytype=pytype, ctype=ctype, to_python_func=to_python_func,
             to_c_func=to_c_func, title=title))
         pxds.append(fh.name)
     pyx_template = jinja2.Template(open("template.pyx", 'rt').read())
-    with open("{}_vector.pyx".format(ctype), 'wt') as fh:
+    with open("generated/{}_vector.pyx".format(ctype), 'wt') as fh:
         fh.write(pyx_template.render(
             pytype=pytype, ctype=ctype, to_python_func=to_python_func,
             to_c_func=to_c_func, title=title, implementat_preamble=implementat_preamble,
@@ -35,6 +35,7 @@ with open("cyarray.pxd", 'wt') as fh:
     fh.write("""
 cdef enum VectorStateEnum:
     should_free = 1
+
 """)
     for pxd in pxds:
         fh.write("include \"%s\"\n" % pxd)

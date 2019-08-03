@@ -1,2 +1,2 @@
-include "double_vector.pyx"
-include "long_vector.pyx"
+include "generated/double_vector.pyx"
+include "generated/long_vector.pyx"

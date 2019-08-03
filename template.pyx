@@ -133,6 +133,18 @@ cdef class {{title}}Vector(object):
         self.flags |= VectorStateEnum.should_free
         return self.impl == NULL
 
+    cdef int free_storage(self) nogil:
+        free_{{ctype}}_vector(self.impl)
+
+    cdef bint get_should_free(self) nogil:
+        return self.flags & VectorStateEnum.should_free
+
+    cdef void set_should_free(self, bint flag) nogil:
+        self.flags &= VectorStateEnum.should_free * flag
+
+    cdef {{ctype}}* get_data(self) nogil:
+        return self.impl.v
+
     cdef {{ctype}} get(self, size_t i) nogil:
         return self.impl.v[i]
 
@@ -189,7 +201,8 @@ cdef class {{title}}Vector(object):
         return dup
 
     def __dealloc__(self):
-        free_{{ctype}}_vector(self.impl)
+        if self.should_free():
+            self.free_storage()
 
     def __len__(self):
         return self.size()

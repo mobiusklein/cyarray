@@ -22,6 +22,12 @@ cdef class DoubleVector(object):
     cdef int allocate_storage(self) nogil
     cdef int allocate_storage_with_size(self, size_t size) nogil
 
+    cdef int free_storage(self) nogil
+    cdef bint get_should_free(self) nogil
+    cdef void set_should_free(self, bint flag) nogil
+
+    cdef double* get_data(self) nogil
+
     @staticmethod
     cdef DoubleVector _create(size_t size)
 
