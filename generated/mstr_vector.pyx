@@ -11,7 +11,9 @@ from cpython.sequence cimport (
     PySequence_Fast_GET_ITEM, PySequence_Fast_GET_SIZE)
 from cpython.slice cimport PySlice_GetIndicesEx
 
-{{implementation_preamble}}
+
+include "mstr.pyx"
+
 
 cdef extern from * nogil:
     int printf (const char *template, ...)
@@ -22,50 +24,50 @@ DEF GROWTH_RATE = 2
 DEF INITIAL_SIZE = 4
 
 
-cdef {{ctype}}_vector* make_{{ctype}}_vector_with_size(size_t size) nogil:
+cdef mstr_vector* make_mstr_vector_with_size(size_t size) nogil:
     cdef:
-        {{ctype}}_vector* vec
+        mstr_vector* vec
 
-    vec = <{{ctype}}_vector*>malloc(sizeof({{ctype}}_vector))
-    vec.v = <{{ctype}}*>malloc(sizeof({{ctype}}) * size)
+    vec = <mstr_vector*>malloc(sizeof(mstr_vector))
+    vec.v = <mstr*>malloc(sizeof(mstr) * size)
     vec.size = size
     vec.used = 0
 
     return vec
 
 
-cdef {{ctype}}_vector* make_{{ctype}}_vector() nogil:
-    return make_{{ctype}}_vector_with_size(INITIAL_SIZE)
+cdef mstr_vector* make_mstr_vector() nogil:
+    return make_mstr_vector_with_size(INITIAL_SIZE)
 
 
-cdef int {{ctype}}_vector_resize({{ctype}}_vector* vec) nogil:
+cdef int mstr_vector_resize(mstr_vector* vec) nogil:
     cdef:
         size_t new_size
-        {{ctype}}* v
+        mstr* v
     new_size = vec.size * GROWTH_RATE
-    v = <{{ctype}}*>realloc(vec.v, sizeof({{ctype}}) * new_size)
+    v = <mstr*>realloc(vec.v, sizeof(mstr) * new_size)
     if v == NULL:
-        printf("{{ctype}}_vector_resize returned -1\n")
+        printf("mstr_vector_resize returned -1\n")
         return -1
     vec.v = v
     vec.size = new_size
     return 0
 
 
-cdef int {{ctype}}_vector_append({{ctype}}_vector* vec, {{ctype}} value) nogil:
+cdef int mstr_vector_append(mstr_vector* vec, mstr value) nogil:
     if (vec.used + 1) >= vec.size:
-        {{ctype}}_vector_resize(vec)
+        mstr_vector_resize(vec)
     vec.v[vec.used] = value
     vec.used += 1
     return 0
 
 
-cdef void free_{{ctype}}_vector({{ctype}}_vector* vec) nogil:
+cdef void free_mstr_vector(mstr_vector* vec) nogil:
     free(vec.v)
     free(vec)
 
 
-cdef void print_{{ctype}}_vector({{ctype}}_vector* vec) nogil:
+cdef void print_mstr_vector(mstr_vector* vec) nogil:
     cdef:
         size_t i
     i = 0
@@ -78,16 +80,16 @@ cdef void print_{{ctype}}_vector({{ctype}}_vector* vec) nogil:
     printf("]\n")
 
 
-cdef void {{ctype}}_vector_reset({{ctype}}_vector* vec) nogil:
+cdef void mstr_vector_reset(mstr_vector* vec) nogil:
     vec.used = 0
 
 
-cdef int {{ctype}}_vector_reserve({{ctype}}_vector* vec, size_t new_size) nogil:
+cdef int mstr_vector_reserve(mstr_vector* vec, size_t new_size) nogil:
     cdef:
-        {{ctype}}* v
-    v = <{{ctype}}*>realloc(vec.v, sizeof({{ctype}}) * new_size)
+        mstr* v
+    v = <mstr*>realloc(vec.v, sizeof(mstr) * new_size)
     if v == NULL:
-        printf("{{ctype}}_vector_resize returned -1\n")
+        printf("mstr_vector_resize returned -1\n")
         return -1
     vec.v = v
     vec.size = new_size
@@ -96,29 +98,27 @@ cdef int {{ctype}}_vector_reserve({{ctype}}_vector* vec, size_t new_size) nogil:
     return 0
 
 
-{% if buffer_type_code != None %}
-cdef char* {{title}}Vector_buffer_type_code = "{{buffer_type_code}}"
-{%- endif %}
+
 
 
 @cython.final
 @cython.freelist(512)
-cdef class {{title}}Vector(object):
+cdef class StringVector(object):
 
     @staticmethod
-    cdef {{title}}Vector _create(size_t size):
+    cdef StringVector _create(size_t size):
         cdef:
-            {{title}}Vector self
-        self = {{title}}Vector.__new__({{title}}Vector)
+            StringVector self
+        self = StringVector.__new__(StringVector)
         self.flags = 0
         self.allocate_storage_with_size(size)
         return self
 
     @staticmethod
-    cdef {{title}}Vector wrap({{ctype}}_vector* vector):
+    cdef StringVector wrap(mstr_vector* vector):
         cdef:
-            {{title}}Vector self
-        self = {{title}}Vector.__new__({{title}}Vector)
+            StringVector self
+        self = StringVector.__new__(StringVector)
         self.flags = 0
         self.impl = vector
         self.set_should_free(False)
@@ -140,21 +140,21 @@ cdef class {{title}}Vector(object):
     cdef int allocate_storage_with_size(self, size_t size) nogil:
         if self.impl != NULL:
             if self.flags & VectorStateEnum.should_free:
-                free_{{ctype}}_vector(self.impl)
-        self.impl = make_{{ctype}}_vector_with_size(size)
+                free_mstr_vector(self.impl)
+        self.impl = make_mstr_vector_with_size(size)
         self.flags |= VectorStateEnum.should_free
         return self.impl == NULL
 
     cdef int allocate_storage(self) nogil:
         if self.impl != NULL:
             if self.flags & VectorStateEnum.should_free:
-                free_{{ctype}}_vector(self.impl)
-        self.impl = make_{{ctype}}_vector()
+                free_mstr_vector(self.impl)
+        self.impl = make_mstr_vector()
         self.flags |= VectorStateEnum.should_free
         return self.impl == NULL
 
     cdef int free_storage(self) nogil:
-        free_{{ctype}}_vector(self.impl)
+        free_mstr_vector(self.impl)
 
     cdef bint get_should_free(self) nogil:
         return self.flags & VectorStateEnum.should_free
@@ -162,24 +162,24 @@ cdef class {{title}}Vector(object):
     cdef void set_should_free(self, bint flag) nogil:
         self.flags &= VectorStateEnum.should_free * flag
 
-    cdef {{ctype}}* get_data(self) nogil:
+    cdef mstr* get_data(self) nogil:
         return self.impl.v
 
-    cdef {{ctype}} get(self, size_t i) nogil:
+    cdef mstr get(self, size_t i) nogil:
         return self.impl.v[i]
 
-    cdef void set(self, size_t i, {{ctype}} value) nogil:
+    cdef void set(self, size_t i, mstr value) nogil:
         self.impl.v[i] = value
 
     cdef size_t size(self) nogil:
         return self.impl.used
 
-    cdef int cappend(self, {{ctype}} value) nogil:
-        return {{ctype}}_vector_append(self.impl, value)
+    cdef int cappend(self, mstr value) nogil:
+        return mstr_vector_append(self.impl, value)
 
-    cpdef int append(self, {{pytype}} value) except *:
+    cpdef int append(self, str value) except *:
         cdef:
-            {{ctype}} cvalue
+            mstr cvalue
         cvalue = self._to_c(value)
         return self.cappend(cvalue)
 
@@ -198,9 +198,9 @@ cdef class {{title}}Vector(object):
                 return 1
 
     cpdef int reserve(self, size_t size) nogil:
-        return {{ctype}}_vector_reserve(self.impl, size)
+        return mstr_vector_reserve(self.impl, size)
 
-    cpdef int fill(self, {{ctype}} value) nogil:
+    cpdef int fill(self, mstr value) nogil:
         cdef:
             size_t i, n
         n = self.size()
@@ -208,23 +208,23 @@ cdef class {{title}}Vector(object):
             self.set(i, value)
         return 0
 
-    cpdef {{title}}Vector copy(self):
+    cpdef StringVector copy(self):
         cdef:
-            {{title}}Vector dup
+            StringVector dup
             size_t i, n
         n = self.size()
-        dup = {{title}}Vector._create(n)
+        dup = StringVector._create(n)
         for i in range(n):
             dup.cappend(self.get(i))
         return dup
 
-    cdef {{title}}Vector _slice(self, object slice_spec):
+    cdef StringVector _slice(self, object slice_spec):
         cdef:
-            {{title}}Vector dup
+            StringVector dup
             Py_ssize_t length, start, stop, step, slice_length, i
         PySlice_GetIndicesEx(
             slice_spec, self.size(), &start, &stop, &step, &slice_length)
-        dup = {{title}}Vector._create(slice_length)
+        dup = StringVector._create(slice_length)
         i = start
         while i < stop:
             dup.cappend(self.get(i))
@@ -276,44 +276,12 @@ cdef class {{title}}Vector(object):
     def __repr__(self):
         return "{self.__class__.__name__}({members})".format(self=self, members=list(self))
 
-{% if buffer_type_code != None %}
-    def __getbuffer__(self, Py_buffer* info, int flags):
-        # This implementation of getbuffer is geared towards Cython
-        # requirements, and does not yet fulfill the PEP.
-        # In particular strided access is always provided regardless
-        # of flags
-        cdef size_t item_count = self.size()
 
-        info.suboffsets = NULL
-        info.buf = <char*>self.impl.v
-        info.readonly = 0
-        info.ndim = 1
-        info.itemsize = sizeof({{ctype}})
-        info.len = info.itemsize * item_count
 
-        info.shape = <Py_ssize_t*> PyObject_Malloc(sizeof(Py_ssize_t) + 2)
-        if not info.shape:
-            raise MemoryError()
-        info.shape[0] = item_count      # constant regardless of resizing
-        info.strides = &info.itemsize
 
-        info.format = {{title}}Vector_buffer_type_code
-        info.obj = self
 
-    def __releasebuffer__(self, Py_buffer* info):
-        PyObject_Free(info.shape)
-{%- endif %}
+    cpdef object _to_python(self, mstr value):
+        return mstr_as_str(value)
 
-{% if sort_fn is not none %}
-    cpdef void qsort(self, bint reverse=False) nogil:
-        if reverse:
-            qsort(self.get_data(), self.size(), sizeof({{ctype}}), {{sort_fn_reverse}})
-        else:
-            qsort(self.get_data(), self.size(), sizeof({{ctype}}), {{sort_fn}})
-{%- endif %}
-
-    cpdef object _to_python(self, {{ctype}} value):
-        return {{to_python_func}}(value)
-
-    cpdef {{ctype}} _to_c(self, object value) except *:
-        return {{to_c_func}}(value)
+    cpdef mstr _to_c(self, object value) except *:
+        return mstr_from_str(value)

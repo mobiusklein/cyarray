@@ -13,8 +13,31 @@ from cpython.slice cimport PySlice_GetIndicesEx
 
 from cpython.int cimport PyInt_FromLong, PyInt_AsLong
 
+cdef int compare_value_long(const void* a, const void* b) nogil:
+    cdef:
+        long av, bv
+    av = (<long*>a)[0]
+    bv = (<long*>b)[0]
+    if av < bv:
+        return -1
+    elif av == bv:
+        return 0
+    else:
+        return 1
+
+
+cdef int compare_value_long_reverse(const void* a, const void* b) nogil:
+    return -compare_value_long(a, b)
+
+
+
 cdef extern from * nogil:
     int printf (const char *template, ...)
+    void qsort (void *base, unsigned short n, unsigned short w, int (*cmp_func)(void*, void*))
+
+
+DEF GROWTH_RATE = 2
+DEF INITIAL_SIZE = 4
 
 
 cdef long_vector* make_long_vector_with_size(size_t size) nogil:
@@ -30,14 +53,14 @@ cdef long_vector* make_long_vector_with_size(size_t size) nogil:
 
 
 cdef long_vector* make_long_vector() nogil:
-    return make_long_vector_with_size(4)
+    return make_long_vector_with_size(INITIAL_SIZE)
 
 
 cdef int long_vector_resize(long_vector* vec) nogil:
     cdef:
         size_t new_size
         long* v
-    new_size = vec.size * 2
+    new_size = vec.size * GROWTH_RATE
     v = <long*>realloc(vec.v, sizeof(long) * new_size)
     if v == NULL:
         printf("long_vector_resize returned -1\n")
@@ -48,7 +71,7 @@ cdef int long_vector_resize(long_vector* vec) nogil:
 
 
 cdef int long_vector_append(long_vector* vec, long value) nogil:
-    if (vec.used + 1) == vec.size:
+    if (vec.used + 1) >= vec.size:
         long_vector_resize(vec)
     vec.v[vec.used] = value
     vec.used += 1
@@ -73,8 +96,22 @@ cdef void print_long_vector(long_vector* vec) nogil:
     printf("]\n")
 
 
-cdef void reset_long_vector(long_vector* vec) nogil:
+cdef void long_vector_reset(long_vector* vec) nogil:
     vec.used = 0
+
+
+cdef int long_vector_reserve(long_vector* vec, size_t new_size) nogil:
+    cdef:
+        long* v
+    v = <long*>realloc(vec.v, sizeof(long) * new_size)
+    if v == NULL:
+        printf("long_vector_resize returned -1\n")
+        return -1
+    vec.v = v
+    vec.size = new_size
+    if new_size > vec.used:
+        vec.used = new_size
+    return 0
 
 
 
@@ -101,6 +138,7 @@ cdef class LongVector(object):
         self = LongVector.__new__(LongVector)
         self.flags = 0
         self.impl = vector
+        self.set_should_free(False)
         return self
 
     def __init__(self, seed=None):
@@ -176,6 +214,17 @@ cdef class LongVector(object):
             if self.append(<object>PySequence_Fast_GET_ITEM(fast_seq, i)) != 0:
                 return 1
 
+    cpdef int reserve(self, size_t size) nogil:
+        return long_vector_reserve(self.impl, size)
+
+    cpdef int fill(self, long value) nogil:
+        cdef:
+            size_t i, n
+        n = self.size()
+        for i in range(n):
+            self.set(i, value)
+        return 0
+
     cpdef LongVector copy(self):
         cdef:
             LongVector dup
@@ -200,7 +249,7 @@ cdef class LongVector(object):
         return dup
 
     def __dealloc__(self):
-        if self.should_free():
+        if self.get_should_free():
             self.free_storage()
 
     def __len__(self):
@@ -270,6 +319,13 @@ cdef class LongVector(object):
 
     def __releasebuffer__(self, Py_buffer* info):
         PyObject_Free(info.shape)
+
+
+    cpdef void qsort(self, bint reverse=False) nogil:
+        if reverse:
+            qsort(self.get_data(), self.size(), sizeof(long), compare_value_long_reverse)
+        else:
+            qsort(self.get_data(), self.size(), sizeof(long), compare_value_long)
 
     cpdef object _to_python(self, long value):
         return PyInt_FromLong(value)

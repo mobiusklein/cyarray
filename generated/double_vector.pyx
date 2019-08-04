@@ -12,9 +12,33 @@ from cpython.sequence cimport (
 from cpython.slice cimport PySlice_GetIndicesEx
 
 from cpython.float cimport PyFloat_FromDouble, PyFloat_AsDouble
+from libc.math cimport fabs
+
+cdef int compare_value_double(const void* a, const void* b) nogil:
+    cdef:
+        double av, bv
+    av = (<double*>a)[0]
+    bv = (<double*>b)[0]
+    if av < bv:
+        return -1
+    elif fabs(av - bv) < 1e-6:
+        return 0
+    else:
+        return 1
+
+
+cdef int compare_value_double_reverse(const void* a, const void* b) nogil:
+    return -compare_value_double(a, b)
+
+
 
 cdef extern from * nogil:
     int printf (const char *template, ...)
+    void qsort (void *base, unsigned short n, unsigned short w, int (*cmp_func)(void*, void*))
+
+
+DEF GROWTH_RATE = 2
+DEF INITIAL_SIZE = 4
 
 
 cdef double_vector* make_double_vector_with_size(size_t size) nogil:
@@ -30,14 +54,14 @@ cdef double_vector* make_double_vector_with_size(size_t size) nogil:
 
 
 cdef double_vector* make_double_vector() nogil:
-    return make_double_vector_with_size(4)
+    return make_double_vector_with_size(INITIAL_SIZE)
 
 
 cdef int double_vector_resize(double_vector* vec) nogil:
     cdef:
         size_t new_size
         double* v
-    new_size = vec.size * 2
+    new_size = vec.size * GROWTH_RATE
     v = <double*>realloc(vec.v, sizeof(double) * new_size)
     if v == NULL:
         printf("double_vector_resize returned -1\n")
@@ -48,7 +72,7 @@ cdef int double_vector_resize(double_vector* vec) nogil:
 
 
 cdef int double_vector_append(double_vector* vec, double value) nogil:
-    if (vec.used + 1) == vec.size:
+    if (vec.used + 1) >= vec.size:
         double_vector_resize(vec)
     vec.v[vec.used] = value
     vec.used += 1
@@ -73,8 +97,22 @@ cdef void print_double_vector(double_vector* vec) nogil:
     printf("]\n")
 
 
-cdef void reset_double_vector(double_vector* vec) nogil:
+cdef void double_vector_reset(double_vector* vec) nogil:
     vec.used = 0
+
+
+cdef int double_vector_reserve(double_vector* vec, size_t new_size) nogil:
+    cdef:
+        double* v
+    v = <double*>realloc(vec.v, sizeof(double) * new_size)
+    if v == NULL:
+        printf("double_vector_resize returned -1\n")
+        return -1
+    vec.v = v
+    vec.size = new_size
+    if new_size > vec.used:
+        vec.used = new_size
+    return 0
 
 
 
@@ -101,6 +139,7 @@ cdef class DoubleVector(object):
         self = DoubleVector.__new__(DoubleVector)
         self.flags = 0
         self.impl = vector
+        self.set_should_free(False)
         return self
 
     def __init__(self, seed=None):
@@ -176,6 +215,17 @@ cdef class DoubleVector(object):
             if self.append(<object>PySequence_Fast_GET_ITEM(fast_seq, i)) != 0:
                 return 1
 
+    cpdef int reserve(self, size_t size) nogil:
+        return double_vector_reserve(self.impl, size)
+
+    cpdef int fill(self, double value) nogil:
+        cdef:
+            size_t i, n
+        n = self.size()
+        for i in range(n):
+            self.set(i, value)
+        return 0
+
     cpdef DoubleVector copy(self):
         cdef:
             DoubleVector dup
@@ -200,7 +250,7 @@ cdef class DoubleVector(object):
         return dup
 
     def __dealloc__(self):
-        if self.should_free():
+        if self.get_should_free():
             self.free_storage()
 
     def __len__(self):
@@ -270,6 +320,13 @@ cdef class DoubleVector(object):
 
     def __releasebuffer__(self, Py_buffer* info):
         PyObject_Free(info.shape)
+
+
+    cpdef void qsort(self, bint reverse=False) nogil:
+        if reverse:
+            qsort(self.get_data(), self.size(), sizeof(double), compare_value_double_reverse)
+        else:
+            qsort(self.get_data(), self.size(), sizeof(double), compare_value_double)
 
     cpdef object _to_python(self, double value):
         return PyFloat_FromDouble(value)

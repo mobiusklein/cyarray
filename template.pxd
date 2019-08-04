@@ -1,4 +1,6 @@
 
+{{definition_preamble}}
+
 cdef struct {{ctype}}_vector:
     {{ctype}}* v
     size_t used
@@ -8,9 +10,11 @@ cdef {{ctype}}_vector* make_{{ctype}}_vector_with_size(size_t size) nogil
 cdef {{ctype}}_vector* make_{{ctype}}_vector() nogil
 cdef int {{ctype}}_vector_resize({{ctype}}_vector* vec) nogil
 cdef int {{ctype}}_vector_append({{ctype}}_vector* vec, {{ctype}} value) nogil
+cdef int {{ctype}}_vector_reserve({{ctype}}_vector* vec, size_t new_size) nogil
+cdef void {{ctype}}_vector_reset({{ctype}}_vector* vec) nogil
+
 cdef void free_{{ctype}}_vector({{ctype}}_vector* vec) nogil
 cdef void print_{{ctype}}_vector({{ctype}}_vector* vec) nogil
-cdef void reset_{{ctype}}_vector({{ctype}}_vector* vec) nogil
 
 cdef class {{title}}Vector(object):
     cdef __cythonbufferdefaults__ = {'ndim' : 1, 'mode':'c'}
@@ -45,6 +49,14 @@ cdef class {{title}}Vector(object):
 
     cpdef int append(self, {{pytype}} value) except *
     cpdef int extend(self, object values) except *
+
+    cpdef int reserve(self, size_t size) nogil
+
+    cpdef int fill(self, {{ctype}} value) nogil
+
+{% if sort_fn is not none %}
+    cpdef void qsort(self, bint reverse=?) nogil
+{%- endif %}
 
     cpdef object _to_python(self, {{ctype}} value)
     cpdef {{ctype}} _to_c(self, object value) except *

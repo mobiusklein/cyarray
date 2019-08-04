@@ -1,4 +1,6 @@
 
+
+
 cdef struct long_vector:
     long* v
     size_t used
@@ -8,9 +10,11 @@ cdef long_vector* make_long_vector_with_size(size_t size) nogil
 cdef long_vector* make_long_vector() nogil
 cdef int long_vector_resize(long_vector* vec) nogil
 cdef int long_vector_append(long_vector* vec, long value) nogil
+cdef int long_vector_reserve(long_vector* vec, size_t new_size) nogil
+cdef void long_vector_reset(long_vector* vec) nogil
+
 cdef void free_long_vector(long_vector* vec) nogil
 cdef void print_long_vector(long_vector* vec) nogil
-cdef void reset_long_vector(long_vector* vec) nogil
 
 cdef class LongVector(object):
     cdef __cythonbufferdefaults__ = {'ndim' : 1, 'mode':'c'}
@@ -45,6 +49,13 @@ cdef class LongVector(object):
 
     cpdef int append(self, object value) except *
     cpdef int extend(self, object values) except *
+
+    cpdef int reserve(self, size_t size) nogil
+
+    cpdef int fill(self, long value) nogil
+
+
+    cpdef void qsort(self, bint reverse=?) nogil
 
     cpdef object _to_python(self, long value)
     cpdef long _to_c(self, object value) except *
