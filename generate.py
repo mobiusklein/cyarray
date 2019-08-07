@@ -76,9 +76,9 @@ cdef int compare_value_long(const void* a, const void* b) nogil:
 
 fill_in_template("str", "mstr", "String", "mstr_as_str", "mstr_from_str",
 """
-include "mstr.pyx"
+include "include/mstr.pyx"
 """, """
-include "mstr.pxd"
+include "include/mstr.pxd"
 """)
 
 with open("cyarray.pxd", 'wt') as fh:

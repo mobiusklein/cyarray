@@ -12,7 +12,7 @@ from cpython.sequence cimport (
 from cpython.slice cimport PySlice_GetIndicesEx
 
 
-include "mstr.pyx"
+include "include/mstr.pyx"
 
 
 cdef extern from * nogil:

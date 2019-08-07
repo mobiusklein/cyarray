@@ -1,6 +1,6 @@
 
 
-include "mstr.pxd"
+include "include/mstr.pxd"
 
 
 cdef struct mstr_vector:
