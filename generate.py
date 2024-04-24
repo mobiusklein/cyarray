@@ -21,7 +21,7 @@ cdef int {sort_fn}_reverse(const void* a, const void* b) noexcept nogil:
         sort_fn_reverse = sort_fn + '_reverse'
     pxd_template = jinja2.Template(open("template.pxd", 'rt').read())
     print(title, sort_fn, sort_fn_reverse)
-    with open("generated/{}_vector.pxd".format(ctype), 'wt') as fh:
+    with open("src/cyarray/generated/{}_vector.pxd".format(ctype), 'wt') as fh:
         fh.write(pxd_template.render(
             pytype=pytype, ctype=ctype, to_python_func=to_python_func,
             to_c_func=to_c_func, title=title,
@@ -29,7 +29,7 @@ cdef int {sort_fn}_reverse(const void* a, const void* b) noexcept nogil:
             sort_fn_reverse=sort_fn_reverse))
         pxds.append(fh.name)
     pyx_template = jinja2.Template(open("template.pyx", 'rt').read())
-    with open("generated/{}_vector.pyx".format(ctype), 'wt') as fh:
+    with open("src/cyarray/generated/{}_vector.pyx".format(ctype), "wt") as fh:
         fh.write(pyx_template.render(
             pytype=pytype, ctype=ctype, to_python_func=to_python_func,
             to_c_func=to_c_func, title=title, implementation_preamble=implementation_preamble,
@@ -120,7 +120,7 @@ include "include/ivl.pxd"
 # include "include/mstr.pxd"
 # """)
 
-with open("cyarray.pxd", 'wt') as fh:
+with open("src/cyarray/cyarray.pxd", 'wt') as fh:
     fh.write("""
 cdef enum VectorStateEnum:
     should_free = 1
@@ -128,6 +128,6 @@ cdef enum VectorStateEnum:
 """)
     for pxd in pxds:
         fh.write("include \"%s\"\n" % pxd)
-with open("cyarray.pyx", 'wt') as fh:
+with open("src/cyarray/cyarray.pyx", "wt") as fh:
     for pyx in pyxs:
         fh.write("include \"%s\"\n" % pyx)

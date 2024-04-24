@@ -1,2 +1,2 @@
 python generate.py
-python cythonizer.py -a -i cyarray.pyx
+python cythonizer.py -a -i src/cyarray/cyarray.pyx

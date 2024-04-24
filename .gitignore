@@ -1,7 +1,9 @@
 .vscode
 build
+dist
 **.pyd
 **.so
 **.c
 **.html
 **.pyc
+*egg-info*
