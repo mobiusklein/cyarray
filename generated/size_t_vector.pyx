@@ -11,24 +11,23 @@ from cpython.sequence cimport (
     PySequence_Fast_GET_ITEM, PySequence_Fast_GET_SIZE)
 from cpython.slice cimport PySlice_GetIndicesEx
 
-from cpython.float cimport PyFloat_FromDouble, PyFloat_AsDouble
-from libc.math cimport fabs
+from cpython.int cimport PyInt_FromSize_t, PyInt_AsLong
 
-cdef int compare_value_double(const void* a, const void* b) noexcept nogil:
+cdef int compare_value_size_t(const void* a, const void* b) noexcept nogil:
     cdef:
-        double av, bv
-    av = (<double*>a)[0]
-    bv = (<double*>b)[0]
+        size_t av, bv
+    av = (<size_t*>a)[0]
+    bv = (<size_t*>b)[0]
     if av < bv:
         return -1
-    elif fabs(av - bv) < 1e-6:
+    elif av == bv:
         return 0
     else:
         return 1
 
 
-cdef int compare_value_double_reverse(const void* a, const void* b) noexcept nogil:
-    return -compare_value_double(a, b)
+cdef int compare_value_size_t_reverse(const void* a, const void* b) noexcept nogil:
+    return -compare_value_size_t(a, b)
 
 
 
@@ -41,51 +40,51 @@ DEF GROWTH_RATE = 2
 DEF INITIAL_SIZE = 4
 
 
-cdef double_vector* make_double_vector_with_size(size_t size) noexcept nogil:
+cdef size_t_vector* make_size_t_vector_with_size(size_t size) noexcept nogil:
     cdef:
-        double_vector* vec
+        size_t_vector* vec
 
-    vec = <double_vector*>malloc(sizeof(double_vector))
-    vec.v = <double*>malloc(sizeof(double) * size)
+    vec = <size_t_vector*>malloc(sizeof(size_t_vector))
+    vec.v = <size_t*>malloc(sizeof(size_t) * size)
     vec.size = size
     vec.used = 0
 
     return vec
 
 
-cdef double_vector* make_double_vector() noexcept nogil:
-    return make_double_vector_with_size(INITIAL_SIZE)
+cdef size_t_vector* make_size_t_vector() noexcept nogil:
+    return make_size_t_vector_with_size(INITIAL_SIZE)
 
 
-cdef int double_vector_resize(double_vector* vec) except -1 nogil:
+cdef int size_t_vector_resize(size_t_vector* vec) except -1 nogil:
     cdef:
         size_t new_size
-        double* v
+        size_t* v
     new_size = vec.size * GROWTH_RATE
-    v = <double*>realloc(vec.v, sizeof(double) * new_size)
+    v = <size_t*>realloc(vec.v, sizeof(size_t) * new_size)
     if v == NULL:
-        printf("double_vector_resize returned -1\n")
+        printf("size_t_vector_resize returned -1\n")
         return -1
     vec.v = v
     vec.size = new_size
     return 0
 
 
-cdef int double_vector_append(double_vector* vec, double value) except -1 nogil:
+cdef int size_t_vector_append(size_t_vector* vec, size_t value) except -1 nogil:
     if (vec.used + 1) >= vec.size:
-        if double_vector_resize(vec) == -1:
+        if size_t_vector_resize(vec) == -1:
             return -1
     vec.v[vec.used] = value
     vec.used += 1
     return 0
 
 
-cdef void free_double_vector(double_vector* vec) noexcept nogil:
+cdef void free_size_t_vector(size_t_vector* vec) noexcept nogil:
     free(vec.v)
     free(vec)
 
 
-cdef void print_double_vector(double_vector* vec) noexcept nogil:
+cdef void print_size_t_vector(size_t_vector* vec) noexcept nogil:
     cdef:
         size_t i
     i = 0
@@ -98,16 +97,16 @@ cdef void print_double_vector(double_vector* vec) noexcept nogil:
     printf("]\n")
 
 
-cdef void double_vector_reset(double_vector* vec) noexcept nogil:
+cdef void size_t_vector_reset(size_t_vector* vec) noexcept nogil:
     vec.used = 0
 
 
-cdef int double_vector_reserve(double_vector* vec, size_t new_size) except -1 nogil:
+cdef int size_t_vector_reserve(size_t_vector* vec, size_t new_size) except -1 nogil:
     cdef:
-        double* v
-    v = <double*>realloc(vec.v, sizeof(double) * new_size)
+        size_t* v
+    v = <size_t*>realloc(vec.v, sizeof(size_t) * new_size)
     if v == NULL:
-        printf("double_vector_resize returned -1\n")
+        printf("size_t_vector_resize returned -1\n")
         return -1
     vec.v = v
     vec.size = new_size
@@ -117,27 +116,27 @@ cdef int double_vector_reserve(double_vector* vec, size_t new_size) except -1 no
 
 
 
-cdef char* DoubleVector_buffer_type_code = "d"
+cdef char* SizeTVector_buffer_type_code = "Q"
 
 
 @cython.final
 @cython.freelist(512)
-cdef class DoubleVector(object):
+cdef class SizeTVector(object):
 
     @staticmethod
-    cdef DoubleVector _create(size_t size):
+    cdef SizeTVector _create(size_t size):
         cdef:
-            DoubleVector self
-        self = DoubleVector.__new__(DoubleVector)
+            SizeTVector self
+        self = SizeTVector.__new__(SizeTVector)
         self.flags = 0
         self.allocate_storage_with_size(size)
         return self
 
     @staticmethod
-    cdef DoubleVector wrap(double_vector* vector):
+    cdef SizeTVector wrap(size_t_vector* vector):
         cdef:
-            DoubleVector self
-        self = DoubleVector.__new__(DoubleVector)
+            SizeTVector self
+        self = SizeTVector.__new__(SizeTVector)
         self.flags = 0
         self.impl = vector
         self.set_should_free(False)
@@ -159,21 +158,21 @@ cdef class DoubleVector(object):
     cdef int allocate_storage_with_size(self, size_t size) noexcept nogil:
         if self.impl != NULL:
             if self.flags & VectorStateEnum.should_free:
-                free_double_vector(self.impl)
-        self.impl = make_double_vector_with_size(size)
+                free_size_t_vector(self.impl)
+        self.impl = make_size_t_vector_with_size(size)
         self.flags |= VectorStateEnum.should_free
         return self.impl == NULL
 
     cdef int allocate_storage(self) noexcept nogil:
         if self.impl != NULL:
             if self.flags & VectorStateEnum.should_free:
-                free_double_vector(self.impl)
-        self.impl = make_double_vector()
+                free_size_t_vector(self.impl)
+        self.impl = make_size_t_vector()
         self.flags |= VectorStateEnum.should_free
         return self.impl == NULL
 
     cdef int free_storage(self) noexcept nogil:
-        free_double_vector(self.impl)
+        free_size_t_vector(self.impl)
 
     cdef bint get_should_free(self) noexcept nogil:
         return self.flags & VectorStateEnum.should_free
@@ -181,24 +180,24 @@ cdef class DoubleVector(object):
     cdef void set_should_free(self, bint flag) noexcept nogil:
         self.flags &= VectorStateEnum.should_free * flag
 
-    cdef double* get_data(self) noexcept nogil:
+    cdef size_t* get_data(self) noexcept nogil:
         return self.impl.v
 
-    cdef double get(self, size_t i) noexcept nogil:
+    cdef size_t get(self, size_t i) noexcept nogil:
         return self.impl.v[i]
 
-    cdef void set(self, size_t i, double value) noexcept nogil:
+    cdef void set(self, size_t i, size_t value) noexcept nogil:
         self.impl.v[i] = value
 
     cdef size_t size(self) noexcept nogil:
         return self.impl.used
 
-    cdef int cappend(self, double value) noexcept nogil:
-        return double_vector_append(self.impl, value)
+    cdef int cappend(self, size_t value) noexcept nogil:
+        return size_t_vector_append(self.impl, value)
 
     cpdef int append(self, object value) except *:
         cdef:
-            double cvalue
+            size_t cvalue
         cvalue = self._to_c(value)
         return self.cappend(cvalue)
 
@@ -217,9 +216,9 @@ cdef class DoubleVector(object):
                 return 1
 
     cpdef int reserve(self, size_t size) except -1 nogil:
-        return double_vector_reserve(self.impl, size)
+        return size_t_vector_reserve(self.impl, size)
 
-    cpdef int fill(self, double value) noexcept nogil:
+    cpdef int fill(self, size_t value) noexcept nogil:
         cdef:
             size_t i, n
         n = self.size()
@@ -227,23 +226,23 @@ cdef class DoubleVector(object):
             self.set(i, value)
         return 0
 
-    cpdef DoubleVector copy(self):
+    cpdef SizeTVector copy(self):
         cdef:
-            DoubleVector dup
+            SizeTVector dup
             size_t i, n
         n = self.size()
-        dup = DoubleVector._create(n)
+        dup = SizeTVector._create(n)
         for i in range(n):
             dup.cappend(self.get(i))
         return dup
 
-    cdef DoubleVector _slice(self, object slice_spec):
+    cdef SizeTVector _slice(self, object slice_spec):
         cdef:
-            DoubleVector dup
+            SizeTVector dup
             Py_ssize_t length, start, stop, step, slice_length, i
         PySlice_GetIndicesEx(
             slice_spec, self.size(), &start, &stop, &step, &slice_length)
-        dup = DoubleVector._create(slice_length)
+        dup = SizeTVector._create(slice_length)
         i = start
         while i < stop:
             dup.cappend(self.get(i))
@@ -307,7 +306,7 @@ cdef class DoubleVector(object):
         info.buf = <char*>self.impl.v
         info.readonly = 0
         info.ndim = 1
-        info.itemsize = sizeof(double)
+        info.itemsize = sizeof(size_t)
         info.len = info.itemsize * item_count
 
         info.shape = <Py_ssize_t*> PyObject_Malloc(sizeof(Py_ssize_t) + 2)
@@ -316,7 +315,7 @@ cdef class DoubleVector(object):
         info.shape[0] = item_count      # constant regardless of resizing
         info.strides = &info.itemsize
 
-        info.format = DoubleVector_buffer_type_code
+        info.format = SizeTVector_buffer_type_code
         info.obj = self
 
     def __releasebuffer__(self, Py_buffer* info):
@@ -325,12 +324,12 @@ cdef class DoubleVector(object):
 
     cpdef void qsort(self, bint reverse=False) noexcept nogil:
         if reverse:
-            qsort(self.get_data(), self.size(), sizeof(double), compare_value_double_reverse)
+            qsort(self.get_data(), self.size(), sizeof(size_t), compare_value_size_t_reverse)
         else:
-            qsort(self.get_data(), self.size(), sizeof(double), compare_value_double)
+            qsort(self.get_data(), self.size(), sizeof(size_t), compare_value_size_t)
 
-    cpdef object _to_python(self, double value):
-        return PyFloat_FromDouble(value)
+    cpdef object _to_python(self, size_t value):
+        return PyInt_FromSize_t(value)
 
-    cpdef double _to_c(self, object value) except *:
-        return PyFloat_AsDouble(value)
+    cpdef size_t _to_c(self, object value) except *:
+        return PyInt_AsLong(value)

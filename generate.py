@@ -14,7 +14,7 @@ def fill_in_template(pytype, ctype, title, to_python_func, to_c_func,
     if sort_fn and not sort_fn_reverse:
         implementation_preamble += '''
 
-cdef int {sort_fn}_reverse(const void* a, const void* b) nogil:
+cdef int {sort_fn}_reverse(const void* a, const void* b) noexcept nogil:
     return -{sort_fn}(a, b)
 
 '''.format(sort_fn=sort_fn)
@@ -38,12 +38,16 @@ cdef int {sort_fn}_reverse(const void* a, const void* b) nogil:
         pyxs.append(fh.name)
 
 
-fill_in_template("object", "double", "Double", "PyFloat_FromDouble",
-                 "PyFloat_AsDouble",
-                 """from cpython.float cimport PyFloat_FromDouble, PyFloat_AsDouble
+fill_in_template(
+    "object",
+    "double",
+    "Double",
+    "PyFloat_FromDouble",
+    "PyFloat_AsDouble",
+    """from cpython.float cimport PyFloat_FromDouble, PyFloat_AsDouble
 from libc.math cimport fabs
 
-cdef int compare_value_double(const void* a, const void* b) nogil:
+cdef int compare_value_double(const void* a, const void* b) noexcept nogil:
     cdef:
         double av, bv
     av = (<double*>a)[0]
@@ -55,12 +59,18 @@ cdef int compare_value_double(const void* a, const void* b) nogil:
     else:
         return 1
 """,
-                 buffer_type_code="d", sort_fn="compare_value_double")
-fill_in_template("object", "long", "Long", "PyInt_FromLong",
-                 "PyInt_AsLong",
-                 """from cpython.int cimport PyInt_FromLong, PyInt_AsLong
+    buffer_type_code="d",
+    sort_fn="compare_value_double",
+)
+fill_in_template(
+    "object",
+    "long",
+    "Long",
+    "PyInt_FromLong",
+    "PyInt_AsLong",
+    """from cpython.int cimport PyInt_FromLong, PyInt_AsLong
 
-cdef int compare_value_long(const void* a, const void* b) nogil:
+cdef int compare_value_long(const void* a, const void* b) noexcept nogil:
     cdef:
         long av, bv
     av = (<long*>a)[0]
@@ -72,14 +82,43 @@ cdef int compare_value_long(const void* a, const void* b) nogil:
     else:
         return 1
 """,
-                 buffer_type_code="l", sort_fn="compare_value_long")
+    buffer_type_code="l",
+    sort_fn="compare_value_long",
+)
 
-fill_in_template("str", "mstr", "String", "mstr_as_str", "mstr_from_str",
+fill_in_template("object", "size_t", "SizeT", "PyInt_FromSize_t",
+                 "PyInt_AsLong",
+                 """from cpython.int cimport PyInt_FromSize_t, PyInt_AsLong
+
+cdef int compare_value_size_t(const void* a, const void* b) noexcept nogil:
+    cdef:
+        size_t av, bv
+    av = (<size_t*>a)[0]
+    bv = (<size_t*>b)[0]
+    if av < bv:
+        return -1
+    elif av == bv:
+        return 0
+    else:
+        return 1
+""",
+                 buffer_type_code="Q", sort_fn="compare_value_size_t")
+
+
+fill_in_template("tuple", "interval_t", "Interval", "tuple_from_interval", "interval_from_tuple",
 """
-include "include/mstr.pyx"
+include "include/ivl.pyx"
 """, """
-include "include/mstr.pxd"
+include "include/ivl.pxd"
 """)
+
+
+# fill_in_template("str", "mstr", "String", "mstr_as_str", "mstr_from_str",
+# """
+# include "include/mstr.pyx"
+# """, """
+# include "include/mstr.pxd"
+# """)
 
 with open("cyarray.pxd", 'wt') as fh:
     fh.write("""

@@ -13,7 +13,7 @@ from cpython.slice cimport PySlice_GetIndicesEx
 
 from cpython.int cimport PyInt_FromLong, PyInt_AsLong
 
-cdef int compare_value_long(const void* a, const void* b) nogil:
+cdef int compare_value_long(const void* a, const void* b) noexcept nogil:
     cdef:
         long av, bv
     av = (<long*>a)[0]
@@ -26,7 +26,7 @@ cdef int compare_value_long(const void* a, const void* b) nogil:
         return 1
 
 
-cdef int compare_value_long_reverse(const void* a, const void* b) nogil:
+cdef int compare_value_long_reverse(const void* a, const void* b) noexcept nogil:
     return -compare_value_long(a, b)
 
 
@@ -40,7 +40,7 @@ DEF GROWTH_RATE = 2
 DEF INITIAL_SIZE = 4
 
 
-cdef long_vector* make_long_vector_with_size(size_t size) nogil:
+cdef long_vector* make_long_vector_with_size(size_t size) noexcept nogil:
     cdef:
         long_vector* vec
 
@@ -52,11 +52,11 @@ cdef long_vector* make_long_vector_with_size(size_t size) nogil:
     return vec
 
 
-cdef long_vector* make_long_vector() nogil:
+cdef long_vector* make_long_vector() noexcept nogil:
     return make_long_vector_with_size(INITIAL_SIZE)
 
 
-cdef int long_vector_resize(long_vector* vec) nogil:
+cdef int long_vector_resize(long_vector* vec) except -1 nogil:
     cdef:
         size_t new_size
         long* v
@@ -70,20 +70,21 @@ cdef int long_vector_resize(long_vector* vec) nogil:
     return 0
 
 
-cdef int long_vector_append(long_vector* vec, long value) nogil:
+cdef int long_vector_append(long_vector* vec, long value) except -1 nogil:
     if (vec.used + 1) >= vec.size:
-        long_vector_resize(vec)
+        if long_vector_resize(vec) == -1:
+            return -1
     vec.v[vec.used] = value
     vec.used += 1
     return 0
 
 
-cdef void free_long_vector(long_vector* vec) nogil:
+cdef void free_long_vector(long_vector* vec) noexcept nogil:
     free(vec.v)
     free(vec)
 
 
-cdef void print_long_vector(long_vector* vec) nogil:
+cdef void print_long_vector(long_vector* vec) noexcept nogil:
     cdef:
         size_t i
     i = 0
@@ -96,11 +97,11 @@ cdef void print_long_vector(long_vector* vec) nogil:
     printf("]\n")
 
 
-cdef void long_vector_reset(long_vector* vec) nogil:
+cdef void long_vector_reset(long_vector* vec) noexcept nogil:
     vec.used = 0
 
 
-cdef int long_vector_reserve(long_vector* vec, size_t new_size) nogil:
+cdef int long_vector_reserve(long_vector* vec, size_t new_size) except -1 nogil:
     cdef:
         long* v
     v = <long*>realloc(vec.v, sizeof(long) * new_size)
@@ -154,7 +155,7 @@ cdef class LongVector(object):
         else:
             self.allocate_storage()
 
-    cdef int allocate_storage_with_size(self, size_t size) nogil:
+    cdef int allocate_storage_with_size(self, size_t size) noexcept nogil:
         if self.impl != NULL:
             if self.flags & VectorStateEnum.should_free:
                 free_long_vector(self.impl)
@@ -162,7 +163,7 @@ cdef class LongVector(object):
         self.flags |= VectorStateEnum.should_free
         return self.impl == NULL
 
-    cdef int allocate_storage(self) nogil:
+    cdef int allocate_storage(self) noexcept nogil:
         if self.impl != NULL:
             if self.flags & VectorStateEnum.should_free:
                 free_long_vector(self.impl)
@@ -170,28 +171,28 @@ cdef class LongVector(object):
         self.flags |= VectorStateEnum.should_free
         return self.impl == NULL
 
-    cdef int free_storage(self) nogil:
+    cdef int free_storage(self) noexcept nogil:
         free_long_vector(self.impl)
 
-    cdef bint get_should_free(self) nogil:
+    cdef bint get_should_free(self) noexcept nogil:
         return self.flags & VectorStateEnum.should_free
 
-    cdef void set_should_free(self, bint flag) nogil:
+    cdef void set_should_free(self, bint flag) noexcept nogil:
         self.flags &= VectorStateEnum.should_free * flag
 
-    cdef long* get_data(self) nogil:
+    cdef long* get_data(self) noexcept nogil:
         return self.impl.v
 
-    cdef long get(self, size_t i) nogil:
+    cdef long get(self, size_t i) noexcept nogil:
         return self.impl.v[i]
 
-    cdef void set(self, size_t i, long value) nogil:
+    cdef void set(self, size_t i, long value) noexcept nogil:
         self.impl.v[i] = value
 
-    cdef size_t size(self) nogil:
+    cdef size_t size(self) noexcept nogil:
         return self.impl.used
 
-    cdef int cappend(self, long value) nogil:
+    cdef int cappend(self, long value) noexcept nogil:
         return long_vector_append(self.impl, value)
 
     cpdef int append(self, object value) except *:
@@ -214,10 +215,10 @@ cdef class LongVector(object):
             if self.append(<object>PySequence_Fast_GET_ITEM(fast_seq, i)) != 0:
                 return 1
 
-    cpdef int reserve(self, size_t size) nogil:
+    cpdef int reserve(self, size_t size) except -1 nogil:
         return long_vector_reserve(self.impl, size)
 
-    cpdef int fill(self, long value) nogil:
+    cpdef int fill(self, long value) noexcept nogil:
         cdef:
             size_t i, n
         n = self.size()
@@ -321,7 +322,7 @@ cdef class LongVector(object):
         PyObject_Free(info.shape)
 
 
-    cpdef void qsort(self, bint reverse=False) nogil:
+    cpdef void qsort(self, bint reverse=False) noexcept nogil:
         if reverse:
             qsort(self.get_data(), self.size(), sizeof(long), compare_value_long_reverse)
         else:

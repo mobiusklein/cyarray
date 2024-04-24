@@ -22,7 +22,7 @@ DEF GROWTH_RATE = 2
 DEF INITIAL_SIZE = 4
 
 
-cdef {{ctype}}_vector* make_{{ctype}}_vector_with_size(size_t size) nogil:
+cdef {{ctype}}_vector* make_{{ctype}}_vector_with_size(size_t size) noexcept nogil:
     cdef:
         {{ctype}}_vector* vec
 
@@ -34,11 +34,11 @@ cdef {{ctype}}_vector* make_{{ctype}}_vector_with_size(size_t size) nogil:
     return vec
 
 
-cdef {{ctype}}_vector* make_{{ctype}}_vector() nogil:
+cdef {{ctype}}_vector* make_{{ctype}}_vector() noexcept nogil:
     return make_{{ctype}}_vector_with_size(INITIAL_SIZE)
 
 
-cdef int {{ctype}}_vector_resize({{ctype}}_vector* vec) nogil:
+cdef int {{ctype}}_vector_resize({{ctype}}_vector* vec) except -1 nogil:
     cdef:
         size_t new_size
         {{ctype}}* v
@@ -52,20 +52,21 @@ cdef int {{ctype}}_vector_resize({{ctype}}_vector* vec) nogil:
     return 0
 
 
-cdef int {{ctype}}_vector_append({{ctype}}_vector* vec, {{ctype}} value) nogil:
+cdef int {{ctype}}_vector_append({{ctype}}_vector* vec, {{ctype}} value) except -1 nogil:
     if (vec.used + 1) >= vec.size:
-        {{ctype}}_vector_resize(vec)
+        if {{ctype}}_vector_resize(vec) == -1:
+            return -1
     vec.v[vec.used] = value
     vec.used += 1
     return 0
 
 
-cdef void free_{{ctype}}_vector({{ctype}}_vector* vec) nogil:
+cdef void free_{{ctype}}_vector({{ctype}}_vector* vec) noexcept nogil:
     free(vec.v)
     free(vec)
 
 
-cdef void print_{{ctype}}_vector({{ctype}}_vector* vec) nogil:
+cdef void print_{{ctype}}_vector({{ctype}}_vector* vec) noexcept nogil:
     cdef:
         size_t i
     i = 0
@@ -78,11 +79,11 @@ cdef void print_{{ctype}}_vector({{ctype}}_vector* vec) nogil:
     printf("]\n")
 
 
-cdef void {{ctype}}_vector_reset({{ctype}}_vector* vec) nogil:
+cdef void {{ctype}}_vector_reset({{ctype}}_vector* vec) noexcept nogil:
     vec.used = 0
 
 
-cdef int {{ctype}}_vector_reserve({{ctype}}_vector* vec, size_t new_size) nogil:
+cdef int {{ctype}}_vector_reserve({{ctype}}_vector* vec, size_t new_size) except -1 nogil:
     cdef:
         {{ctype}}* v
     v = <{{ctype}}*>realloc(vec.v, sizeof({{ctype}}) * new_size)
@@ -137,7 +138,7 @@ cdef class {{title}}Vector(object):
         else:
             self.allocate_storage()
 
-    cdef int allocate_storage_with_size(self, size_t size) nogil:
+    cdef int allocate_storage_with_size(self, size_t size) noexcept nogil:
         if self.impl != NULL:
             if self.flags & VectorStateEnum.should_free:
                 free_{{ctype}}_vector(self.impl)
@@ -145,7 +146,7 @@ cdef class {{title}}Vector(object):
         self.flags |= VectorStateEnum.should_free
         return self.impl == NULL
 
-    cdef int allocate_storage(self) nogil:
+    cdef int allocate_storage(self) noexcept nogil:
         if self.impl != NULL:
             if self.flags & VectorStateEnum.should_free:
                 free_{{ctype}}_vector(self.impl)
@@ -153,28 +154,28 @@ cdef class {{title}}Vector(object):
         self.flags |= VectorStateEnum.should_free
         return self.impl == NULL
 
-    cdef int free_storage(self) nogil:
+    cdef int free_storage(self) noexcept nogil:
         free_{{ctype}}_vector(self.impl)
 
-    cdef bint get_should_free(self) nogil:
+    cdef bint get_should_free(self) noexcept nogil:
         return self.flags & VectorStateEnum.should_free
 
-    cdef void set_should_free(self, bint flag) nogil:
+    cdef void set_should_free(self, bint flag) noexcept nogil:
         self.flags &= VectorStateEnum.should_free * flag
 
-    cdef {{ctype}}* get_data(self) nogil:
+    cdef {{ctype}}* get_data(self) noexcept nogil:
         return self.impl.v
 
-    cdef {{ctype}} get(self, size_t i) nogil:
+    cdef {{ctype}} get(self, size_t i) noexcept nogil:
         return self.impl.v[i]
 
-    cdef void set(self, size_t i, {{ctype}} value) nogil:
+    cdef void set(self, size_t i, {{ctype}} value) noexcept nogil:
         self.impl.v[i] = value
 
-    cdef size_t size(self) nogil:
+    cdef size_t size(self) noexcept nogil:
         return self.impl.used
 
-    cdef int cappend(self, {{ctype}} value) nogil:
+    cdef int cappend(self, {{ctype}} value) noexcept nogil:
         return {{ctype}}_vector_append(self.impl, value)
 
     cpdef int append(self, {{pytype}} value) except *:
@@ -197,10 +198,10 @@ cdef class {{title}}Vector(object):
             if self.append(<object>PySequence_Fast_GET_ITEM(fast_seq, i)) != 0:
                 return 1
 
-    cpdef int reserve(self, size_t size) nogil:
+    cpdef int reserve(self, size_t size) except -1 nogil:
         return {{ctype}}_vector_reserve(self.impl, size)
 
-    cpdef int fill(self, {{ctype}} value) nogil:
+    cpdef int fill(self, {{ctype}} value) noexcept nogil:
         cdef:
             size_t i, n
         n = self.size()
@@ -305,7 +306,7 @@ cdef class {{title}}Vector(object):
 {%- endif %}
 
 {% if sort_fn is not none %}
-    cpdef void qsort(self, bint reverse=False) nogil:
+    cpdef void qsort(self, bint reverse=False) noexcept nogil:
         if reverse:
             qsort(self.get_data(), self.size(), sizeof({{ctype}}), {{sort_fn_reverse}})
         else:
