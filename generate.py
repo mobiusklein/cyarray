@@ -105,20 +105,34 @@ cdef int compare_value_size_t(const void* a, const void* b) noexcept nogil:
                  buffer_type_code="Q", sort_fn="compare_value_size_t")
 
 
-fill_in_template("tuple", "interval_t", "Interval", "tuple_from_interval", "interval_from_tuple",
-"""
-include "include/ivl.pyx"
-""", """
-include "include/ivl.pxd"
-""")
+fill_in_template(
+    "tuple",
+    "interval_t",
+    "Interval",
+    "tuple_from_interval",
+    "interval_from_tuple",
+    """
+include "src/cyarray/include/ivl.pyx"
+""",
+    """
+include "src/cyarray/include/ivl.pxd"
+""",
+)
 
 
-# fill_in_template("str", "mstr", "String", "mstr_as_str", "mstr_from_str",
-# """
-# include "include/mstr.pyx"
-# """, """
-# include "include/mstr.pxd"
-# """)
+fill_in_template(
+    "unicode",
+    "mstr",
+    "String",
+    "mstr_as_str",
+    "mstr_from_str",
+    """
+include "src/cyarray/include/mstr.pyx"
+""",
+    """
+include "src/cyarray/include/mstr.pxd"
+""",
+)
 
 with open("src/cyarray/cyarray.pxd", 'wt') as fh:
     fh.write("""

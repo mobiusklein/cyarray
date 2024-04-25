@@ -12,7 +12,7 @@ from cpython.sequence cimport (
 from cpython.slice cimport PySlice_GetIndicesEx
 
 
-include "include/ivl.pyx"
+include "src/cyarray/include/ivl.pyx"
 
 
 cdef extern from * nogil:

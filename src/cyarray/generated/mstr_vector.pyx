@@ -12,7 +12,7 @@ from cpython.sequence cimport (
 from cpython.slice cimport PySlice_GetIndicesEx
 
 
-include "include/mstr.pyx"
+include "src/cyarray/include/mstr.pyx"
 
 
 cdef extern from * nogil:
@@ -24,7 +24,7 @@ DEF GROWTH_RATE = 2
 DEF INITIAL_SIZE = 4
 
 
-cdef mstr_vector* make_mstr_vector_with_size(size_t size) nogil:
+cdef mstr_vector* make_mstr_vector_with_size(size_t size) noexcept nogil:
     cdef:
         mstr_vector* vec
 
@@ -36,11 +36,11 @@ cdef mstr_vector* make_mstr_vector_with_size(size_t size) nogil:
     return vec
 
 
-cdef mstr_vector* make_mstr_vector() nogil:
+cdef mstr_vector* make_mstr_vector() noexcept nogil:
     return make_mstr_vector_with_size(INITIAL_SIZE)
 
 
-cdef int mstr_vector_resize(mstr_vector* vec) nogil:
+cdef int mstr_vector_resize(mstr_vector* vec) except -1 nogil:
     cdef:
         size_t new_size
         mstr* v
@@ -54,20 +54,21 @@ cdef int mstr_vector_resize(mstr_vector* vec) nogil:
     return 0
 
 
-cdef int mstr_vector_append(mstr_vector* vec, mstr value) nogil:
+cdef int mstr_vector_append(mstr_vector* vec, mstr value) except -1 nogil:
     if (vec.used + 1) >= vec.size:
-        mstr_vector_resize(vec)
+        if mstr_vector_resize(vec) == -1:
+            return -1
     vec.v[vec.used] = value
     vec.used += 1
     return 0
 
 
-cdef void free_mstr_vector(mstr_vector* vec) nogil:
+cdef void free_mstr_vector(mstr_vector* vec) noexcept nogil:
     free(vec.v)
     free(vec)
 
 
-cdef void print_mstr_vector(mstr_vector* vec) nogil:
+cdef void print_mstr_vector(mstr_vector* vec) noexcept nogil:
     cdef:
         size_t i
     i = 0
@@ -80,11 +81,11 @@ cdef void print_mstr_vector(mstr_vector* vec) nogil:
     printf("]\n")
 
 
-cdef void mstr_vector_reset(mstr_vector* vec) nogil:
+cdef void mstr_vector_reset(mstr_vector* vec) noexcept nogil:
     vec.used = 0
 
 
-cdef int mstr_vector_reserve(mstr_vector* vec, size_t new_size) nogil:
+cdef int mstr_vector_reserve(mstr_vector* vec, size_t new_size) except -1 nogil:
     cdef:
         mstr* v
     v = <mstr*>realloc(vec.v, sizeof(mstr) * new_size)
@@ -137,7 +138,7 @@ cdef class StringVector(object):
         else:
             self.allocate_storage()
 
-    cdef int allocate_storage_with_size(self, size_t size) nogil:
+    cdef int allocate_storage_with_size(self, size_t size) noexcept nogil:
         if self.impl != NULL:
             if self.flags & VectorStateEnum.should_free:
                 free_mstr_vector(self.impl)
@@ -145,7 +146,7 @@ cdef class StringVector(object):
         self.flags |= VectorStateEnum.should_free
         return self.impl == NULL
 
-    cdef int allocate_storage(self) nogil:
+    cdef int allocate_storage(self) noexcept nogil:
         if self.impl != NULL:
             if self.flags & VectorStateEnum.should_free:
                 free_mstr_vector(self.impl)
@@ -153,31 +154,31 @@ cdef class StringVector(object):
         self.flags |= VectorStateEnum.should_free
         return self.impl == NULL
 
-    cdef int free_storage(self) nogil:
+    cdef int free_storage(self) noexcept nogil:
         free_mstr_vector(self.impl)
 
-    cdef bint get_should_free(self) nogil:
+    cdef bint get_should_free(self) noexcept nogil:
         return self.flags & VectorStateEnum.should_free
 
-    cdef void set_should_free(self, bint flag) nogil:
+    cdef void set_should_free(self, bint flag) noexcept nogil:
         self.flags &= VectorStateEnum.should_free * flag
 
-    cdef mstr* get_data(self) nogil:
+    cdef mstr* get_data(self) noexcept nogil:
         return self.impl.v
 
-    cdef mstr get(self, size_t i) nogil:
+    cdef mstr get(self, size_t i) noexcept nogil:
         return self.impl.v[i]
 
-    cdef void set(self, size_t i, mstr value) nogil:
+    cdef void set(self, size_t i, mstr value) noexcept nogil:
         self.impl.v[i] = value
 
-    cdef size_t size(self) nogil:
+    cdef size_t size(self) noexcept nogil:
         return self.impl.used
 
-    cdef int cappend(self, mstr value) nogil:
+    cdef int cappend(self, mstr value) noexcept nogil:
         return mstr_vector_append(self.impl, value)
 
-    cpdef int append(self, str value) except *:
+    cpdef int append(self, unicode value) except *:
         cdef:
             mstr cvalue
         cvalue = self._to_c(value)
@@ -197,10 +198,10 @@ cdef class StringVector(object):
             if self.append(<object>PySequence_Fast_GET_ITEM(fast_seq, i)) != 0:
                 return 1
 
-    cpdef int reserve(self, size_t size) nogil:
+    cpdef int reserve(self, size_t size) except -1 nogil:
         return mstr_vector_reserve(self.impl, size)
 
-    cpdef int fill(self, mstr value) nogil:
+    cpdef int fill(self, mstr value) noexcept nogil:
         cdef:
             size_t i, n
         n = self.size()

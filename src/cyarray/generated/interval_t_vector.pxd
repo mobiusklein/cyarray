@@ -1,6 +1,6 @@
 
 
-include "include/ivl.pxd"
+include "src/cyarray/include/ivl.pxd"
 
 
 cdef struct interval_t_vector:
