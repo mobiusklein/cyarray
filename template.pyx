@@ -9,6 +9,7 @@ from cpython.mem cimport PyObject_Malloc, PyObject_Free
 from cpython.sequence cimport (
     PySequence_Size, PySequence_Check, PySequence_Fast,
     PySequence_Fast_GET_ITEM, PySequence_Fast_GET_SIZE)
+from cpython.number cimport PyNumber_Check, PyNumber_AsSsize_t
 from cpython.slice cimport PySlice_GetIndicesEx
 
 {{implementation_preamble}}
@@ -66,19 +67,6 @@ cdef void free_{{ctype}}_vector({{ctype}}_vector* vec) noexcept nogil:
     free(vec)
 
 
-cdef void print_{{ctype}}_vector({{ctype}}_vector* vec) noexcept nogil:
-    cdef:
-        size_t i
-    i = 0
-    printf("[")
-    while i < vec.used:
-        printf("%0.6f", vec.v[i])
-        if i != (vec.used - 1):
-            printf(", ")
-        i += 1
-    printf("]\n")
-
-
 cdef void {{ctype}}_vector_reset({{ctype}}_vector* vec) noexcept nogil:
     vec.used = 0
 
@@ -126,15 +114,26 @@ cdef class {{title}}Vector(object):
         return self
 
     def __init__(self, seed=None):
+        """
+        Create a new :class:`{{title}}Vector` instance, optionally from an iterable of coercable types,
+        or an integer to pre-allocate empty capacity.
+
+        The :class:`{{title}}Vector` is a resize-able sequence-like data type storing a C `{{ctype}}`
+        values in a raw array. This array supports the buffer protocol.
+        """
         cdef:
             size_t n
         self.flags = 0
         if seed is not None:
-            if not PySequence_Check(seed):
-                raise TypeError("Must provide a Sequence-like object")
-            n = len(seed)
-            self.allocate_storage_with_size(n)
-            self.extend(seed)
+            if PyNumber_Check(seed):
+                n = PyNumber_AsSsize_t(seed, IndexError)
+                self.allocate_storage_with_size(n)
+            elif PySequence_Check(seed):
+                n = len(seed)
+                self.allocate_storage_with_size(n)
+                self.extend(seed)
+            else:
+                raise TypeError("Must provide a Sequence-like object or an integer")
         else:
             self.allocate_storage()
 
@@ -179,12 +178,14 @@ cdef class {{title}}Vector(object):
         return {{ctype}}_vector_append(self.impl, value)
 
     cpdef int append(self, {{pytype}} value) except *:
+        """Append a Python coerce-able value to the array."""
         cdef:
             {{ctype}} cvalue
         cvalue = self._to_c(value)
         return self.cappend(cvalue)
 
     cpdef int extend(self, object values) except *:
+        """Incrementally append `values` to the array."""
         cdef:
             size_t i, n
             object fast_seq
@@ -199,9 +200,11 @@ cdef class {{title}}Vector(object):
                 return 1
 
     cpdef int reserve(self, size_t size) except -1 nogil:
+        """Reserve `size` capacity or shrink to fit."""
         return {{ctype}}_vector_reserve(self.impl, size)
 
     cpdef int fill(self, {{ctype}} value) noexcept nogil:
+        """Fill all unused capacity with `value`"""
         cdef:
             size_t i, n
         n = self.size()
@@ -210,6 +213,7 @@ cdef class {{title}}Vector(object):
         return 0
 
     cpdef {{title}}Vector copy(self):
+        """Make a copy of this array with separate memory storage"""
         cdef:
             {{title}}Vector dup
             size_t i, n
@@ -307,6 +311,7 @@ cdef class {{title}}Vector(object):
 
 {% if sort_fn is not none %}
     cpdef void qsort(self, bint reverse=False) noexcept nogil:
+        """Sort the array in-place"""
         if reverse:
             qsort(self.get_data(), self.size(), sizeof({{ctype}}), {{sort_fn_reverse}})
         else:

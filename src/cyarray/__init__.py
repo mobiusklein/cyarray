@@ -1,1 +1,1 @@
-from .cyarray import *
+from cyarray.cyarray import *
