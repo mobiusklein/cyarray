@@ -14,7 +14,6 @@ cdef int long_vector_reserve(long_vector* vec, size_t new_size) except -1 nogil
 cdef void long_vector_reset(long_vector* vec) noexcept nogil
 
 cdef void free_long_vector(long_vector* vec) noexcept nogil
-cdef void print_long_vector(long_vector* vec) noexcept nogil
 
 cdef class LongVector(object):
     cdef __cythonbufferdefaults__ = {'ndim' : 1, 'mode':'c'}

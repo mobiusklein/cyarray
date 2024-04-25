@@ -9,6 +9,7 @@ from cpython.mem cimport PyObject_Malloc, PyObject_Free
 from cpython.sequence cimport (
     PySequence_Size, PySequence_Check, PySequence_Fast,
     PySequence_Fast_GET_ITEM, PySequence_Fast_GET_SIZE)
+from cpython.number cimport PyNumber_Check, PyNumber_AsSsize_t
 from cpython.slice cimport PySlice_GetIndicesEx
 
 from cpython.int cimport PyInt_FromSize_t, PyInt_AsLong
@@ -84,19 +85,6 @@ cdef void free_size_t_vector(size_t_vector* vec) noexcept nogil:
     free(vec)
 
 
-cdef void print_size_t_vector(size_t_vector* vec) noexcept nogil:
-    cdef:
-        size_t i
-    i = 0
-    printf("[")
-    while i < vec.used:
-        printf("%0.6f", vec.v[i])
-        if i != (vec.used - 1):
-            printf(", ")
-        i += 1
-    printf("]\n")
-
-
 cdef void size_t_vector_reset(size_t_vector* vec) noexcept nogil:
     vec.used = 0
 
@@ -143,15 +131,26 @@ cdef class SizeTVector(object):
         return self
 
     def __init__(self, seed=None):
+        """
+        Create a new :class:`SizeTVector` instance, optionally from an iterable of coercable types,
+        or an integer to pre-allocate empty capacity.
+
+        The :class:`SizeTVector` is a resize-able sequence-like data type storing a C `size_t`
+        values in a raw array. This array supports the buffer protocol.
+        """
         cdef:
             size_t n
         self.flags = 0
         if seed is not None:
-            if not PySequence_Check(seed):
-                raise TypeError("Must provide a Sequence-like object")
-            n = len(seed)
-            self.allocate_storage_with_size(n)
-            self.extend(seed)
+            if PyNumber_Check(seed):
+                n = PyNumber_AsSsize_t(seed, IndexError)
+                self.allocate_storage_with_size(n)
+            elif PySequence_Check(seed):
+                n = len(seed)
+                self.allocate_storage_with_size(n)
+                self.extend(seed)
+            else:
+                raise TypeError("Must provide a Sequence-like object or an integer")
         else:
             self.allocate_storage()
 
@@ -196,12 +195,14 @@ cdef class SizeTVector(object):
         return size_t_vector_append(self.impl, value)
 
     cpdef int append(self, object value) except *:
+        """Append a Python coerce-able value to the array."""
         cdef:
             size_t cvalue
         cvalue = self._to_c(value)
         return self.cappend(cvalue)
 
     cpdef int extend(self, object values) except *:
+        """Incrementally append `values` to the array."""
         cdef:
             size_t i, n
             object fast_seq
@@ -216,9 +217,11 @@ cdef class SizeTVector(object):
                 return 1
 
     cpdef int reserve(self, size_t size) except -1 nogil:
+        """Reserve `size` capacity or shrink to fit."""
         return size_t_vector_reserve(self.impl, size)
 
     cpdef int fill(self, size_t value) noexcept nogil:
+        """Fill all unused capacity with `value`"""
         cdef:
             size_t i, n
         n = self.size()
@@ -227,6 +230,7 @@ cdef class SizeTVector(object):
         return 0
 
     cpdef SizeTVector copy(self):
+        """Make a copy of this array with separate memory storage"""
         cdef:
             SizeTVector dup
             size_t i, n
@@ -323,6 +327,7 @@ cdef class SizeTVector(object):
 
 
     cpdef void qsort(self, bint reverse=False) noexcept nogil:
+        """Sort the array in-place"""
         if reverse:
             qsort(self.get_data(), self.size(), sizeof(size_t), compare_value_size_t_reverse)
         else:

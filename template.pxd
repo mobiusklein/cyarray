@@ -14,7 +14,6 @@ cdef int {{ctype}}_vector_reserve({{ctype}}_vector* vec, size_t new_size) except
 cdef void {{ctype}}_vector_reset({{ctype}}_vector* vec) noexcept nogil
 
 cdef void free_{{ctype}}_vector({{ctype}}_vector* vec) noexcept nogil
-cdef void print_{{ctype}}_vector({{ctype}}_vector* vec) noexcept nogil
 
 cdef class {{title}}Vector(object):
     cdef __cythonbufferdefaults__ = {'ndim' : 1, 'mode':'c'}

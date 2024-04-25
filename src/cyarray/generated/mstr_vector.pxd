@@ -16,7 +16,6 @@ cdef int mstr_vector_reserve(mstr_vector* vec, size_t new_size) except -1 nogil
 cdef void mstr_vector_reset(mstr_vector* vec) noexcept nogil
 
 cdef void free_mstr_vector(mstr_vector* vec) noexcept nogil
-cdef void print_mstr_vector(mstr_vector* vec) noexcept nogil
 
 cdef class StringVector(object):
     cdef __cythonbufferdefaults__ = {'ndim' : 1, 'mode':'c'}

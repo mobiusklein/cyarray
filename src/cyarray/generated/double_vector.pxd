@@ -14,7 +14,6 @@ cdef int double_vector_reserve(double_vector* vec, size_t new_size) except -1 no
 cdef void double_vector_reset(double_vector* vec) noexcept nogil
 
 cdef void free_double_vector(double_vector* vec) noexcept nogil
-cdef void print_double_vector(double_vector* vec) noexcept nogil
 
 cdef class DoubleVector(object):
     cdef __cythonbufferdefaults__ = {'ndim' : 1, 'mode':'c'}

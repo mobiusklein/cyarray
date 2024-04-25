@@ -14,7 +14,6 @@ cdef int size_t_vector_reserve(size_t_vector* vec, size_t new_size) except -1 no
 cdef void size_t_vector_reset(size_t_vector* vec) noexcept nogil
 
 cdef void free_size_t_vector(size_t_vector* vec) noexcept nogil
-cdef void print_size_t_vector(size_t_vector* vec) noexcept nogil
 
 cdef class SizeTVector(object):
     cdef __cythonbufferdefaults__ = {'ndim' : 1, 'mode':'c'}

@@ -16,7 +16,6 @@ cdef int interval_t_vector_reserve(interval_t_vector* vec, size_t new_size) exce
 cdef void interval_t_vector_reset(interval_t_vector* vec) noexcept nogil
 
 cdef void free_interval_t_vector(interval_t_vector* vec) noexcept nogil
-cdef void print_interval_t_vector(interval_t_vector* vec) noexcept nogil
 
 cdef class IntervalVector(object):
     cdef __cythonbufferdefaults__ = {'ndim' : 1, 'mode':'c'}
