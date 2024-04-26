@@ -11,6 +11,7 @@ from cpython.sequence cimport (
     PySequence_Fast_GET_ITEM, PySequence_Fast_GET_SIZE)
 from cpython.number cimport PyNumber_Check, PyNumber_AsSsize_t
 from cpython.slice cimport PySlice_GetIndicesEx
+from cpython.exc cimport PyErr_SetString, PyErr_NoMemory
 
 {{implementation_preamble}}
 
@@ -46,7 +47,8 @@ cdef int {{ctype}}_vector_resize({{ctype}}_vector* vec) except -1 nogil:
     new_size = vec.size * GROWTH_RATE
     v = <{{ctype}}*>realloc(vec.v, sizeof({{ctype}}) * new_size)
     if v == NULL:
-        printf("{{ctype}}_vector_resize returned -1\n")
+        with gil:
+            PyErr_SetString(MemoryError, "{{ctype}}_vector_resize failed")
         return -1
     vec.v = v
     vec.size = new_size
@@ -76,7 +78,8 @@ cdef int {{ctype}}_vector_reserve({{ctype}}_vector* vec, size_t new_size) except
         {{ctype}}* v
     v = <{{ctype}}*>realloc(vec.v, sizeof({{ctype}}) * new_size)
     if v == NULL:
-        printf("{{ctype}}_vector_resize returned -1\n")
+        with gil:
+            PyErr_SetString(MemoryError, "{{ctype}}_vector_reserve failed")
         return -1
     vec.v = v
     vec.size = new_size
@@ -93,6 +96,10 @@ cdef char* {{title}}Vector_buffer_type_code = "{{buffer_type_code}}"
 @cython.final
 @cython.freelist(512)
 cdef class {{title}}Vector(object):
+    """
+    The :class:`{{title}}Vector` is a resize-able sequence-like data type storing a C `{{ctype}}`
+    values in a raw array. {% if buffer_type_code != None %}This array supports the buffer protocol. {%- endif %}
+    """
 
     @staticmethod
     cdef {{title}}Vector _create(size_t size):
@@ -117,9 +124,6 @@ cdef class {{title}}Vector(object):
         """
         Create a new :class:`{{title}}Vector` instance, optionally from an iterable of coercable types,
         or an integer to pre-allocate empty capacity.
-
-        The :class:`{{title}}Vector` is a resize-able sequence-like data type storing a C `{{ctype}}`
-        values in a raw array. This array supports the buffer protocol.
         """
         cdef:
             size_t n
@@ -204,7 +208,11 @@ cdef class {{title}}Vector(object):
         return {{ctype}}_vector_reserve(self.impl, size)
 
     cpdef int fill(self, {{ctype}} value) noexcept nogil:
-        """Fill all unused capacity with `value`"""
+        """
+        Fill all positions with `value`.
+
+        Leaves unused capacity unaffected.
+        """
         cdef:
             size_t i, n
         n = self.size()
@@ -310,7 +318,7 @@ cdef class {{title}}Vector(object):
 {%- endif %}
 
 {% if sort_fn is not none %}
-    cpdef void qsort(self, bint reverse=False) noexcept nogil:
+    cpdef void sort(self, bint reverse=False) noexcept nogil:
         """Sort the array in-place"""
         if reverse:
             qsort(self.get_data(), self.size(), sizeof({{ctype}}), {{sort_fn_reverse}})

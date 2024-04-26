@@ -56,6 +56,7 @@ cdef class IntervalVector(object):
     cpdef int fill(self, interval_t value) noexcept nogil
 
 
+    cpdef void sort(self, bint reverse=?) noexcept nogil
 
     cpdef object _to_python(self, interval_t value)
     cpdef interval_t _to_c(self, object value) except *

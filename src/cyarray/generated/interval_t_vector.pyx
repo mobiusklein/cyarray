@@ -11,9 +11,15 @@ from cpython.sequence cimport (
     PySequence_Fast_GET_ITEM, PySequence_Fast_GET_SIZE)
 from cpython.number cimport PyNumber_Check, PyNumber_AsSsize_t
 from cpython.slice cimport PySlice_GetIndicesEx
+from cpython.exc cimport PyErr_SetString, PyErr_NoMemory
 
 
 include "src/cyarray/include/ivl.pyx"
+
+
+cdef int compare_value_interval_t_reverse(const void* a, const void* b) noexcept nogil:
+    return -compare_value_interval_t(a, b)
+
 
 
 cdef extern from * nogil:
@@ -48,7 +54,8 @@ cdef int interval_t_vector_resize(interval_t_vector* vec) except -1 nogil:
     new_size = vec.size * GROWTH_RATE
     v = <interval_t*>realloc(vec.v, sizeof(interval_t) * new_size)
     if v == NULL:
-        printf("interval_t_vector_resize returned -1\n")
+        with gil:
+            PyErr_SetString(MemoryError, "interval_t_vector_resize failed")
         return -1
     vec.v = v
     vec.size = new_size
@@ -78,7 +85,8 @@ cdef int interval_t_vector_reserve(interval_t_vector* vec, size_t new_size) exce
         interval_t* v
     v = <interval_t*>realloc(vec.v, sizeof(interval_t) * new_size)
     if v == NULL:
-        printf("interval_t_vector_resize returned -1\n")
+        with gil:
+            PyErr_SetString(MemoryError, "interval_t_vector_reserve failed")
         return -1
     vec.v = v
     vec.size = new_size
@@ -88,11 +96,16 @@ cdef int interval_t_vector_reserve(interval_t_vector* vec, size_t new_size) exce
 
 
 
+cdef char* IntervalVector_buffer_type_code = "NN"
 
 
 @cython.final
 @cython.freelist(512)
 cdef class IntervalVector(object):
+    """
+    The :class:`IntervalVector` is a resize-able sequence-like data type storing a C `interval_t`
+    values in a raw array. This array supports the buffer protocol.
+    """
 
     @staticmethod
     cdef IntervalVector _create(size_t size):
@@ -117,9 +130,6 @@ cdef class IntervalVector(object):
         """
         Create a new :class:`IntervalVector` instance, optionally from an iterable of coercable types,
         or an integer to pre-allocate empty capacity.
-
-        The :class:`IntervalVector` is a resize-able sequence-like data type storing a C `interval_t`
-        values in a raw array. This array supports the buffer protocol.
         """
         cdef:
             size_t n
@@ -204,7 +214,11 @@ cdef class IntervalVector(object):
         return interval_t_vector_reserve(self.impl, size)
 
     cpdef int fill(self, interval_t value) noexcept nogil:
-        """Fill all unused capacity with `value`"""
+        """
+        Fill all positions with `value`.
+
+        Leaves unused capacity unaffected.
+        """
         cdef:
             size_t i, n
         n = self.size()
@@ -282,8 +296,39 @@ cdef class IntervalVector(object):
         return "{self.__class__.__name__}({members})".format(self=self, members=list(self))
 
 
+    def __getbuffer__(self, Py_buffer* info, int flags):
+        # This implementation of getbuffer is geared towards Cython
+        # requirements, and does not yet fulfill the PEP.
+        # In particular strided access is always provided regardless
+        # of flags
+        cdef size_t item_count = self.size()
+
+        info.suboffsets = NULL
+        info.buf = <char*>self.impl.v
+        info.readonly = 0
+        info.ndim = 1
+        info.itemsize = sizeof(interval_t)
+        info.len = info.itemsize * item_count
+
+        info.shape = <Py_ssize_t*> PyObject_Malloc(sizeof(Py_ssize_t) + 2)
+        if not info.shape:
+            raise MemoryError()
+        info.shape[0] = item_count      # constant regardless of resizing
+        info.strides = &info.itemsize
+
+        info.format = IntervalVector_buffer_type_code
+        info.obj = self
+
+    def __releasebuffer__(self, Py_buffer* info):
+        PyObject_Free(info.shape)
 
 
+    cpdef void sort(self, bint reverse=False) noexcept nogil:
+        """Sort the array in-place"""
+        if reverse:
+            qsort(self.get_data(), self.size(), sizeof(interval_t), compare_value_interval_t_reverse)
+        else:
+            qsort(self.get_data(), self.size(), sizeof(interval_t), compare_value_interval_t)
 
     cpdef object _to_python(self, interval_t value):
         return tuple_from_interval(value)

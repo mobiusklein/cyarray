@@ -54,7 +54,7 @@ cdef class DoubleVector(object):
     cpdef int fill(self, double value) noexcept nogil
 
 
-    cpdef void qsort(self, bint reverse=?) noexcept nogil
+    cpdef void sort(self, bint reverse=?) noexcept nogil
 
     cpdef object _to_python(self, double value)
     cpdef double _to_c(self, object value) except *

@@ -11,6 +11,7 @@ from cpython.sequence cimport (
     PySequence_Fast_GET_ITEM, PySequence_Fast_GET_SIZE)
 from cpython.number cimport PyNumber_Check, PyNumber_AsSsize_t
 from cpython.slice cimport PySlice_GetIndicesEx
+from cpython.exc cimport PyErr_SetString, PyErr_NoMemory
 
 from cpython.int cimport PyInt_FromLong, PyInt_AsLong
 
@@ -64,7 +65,8 @@ cdef int long_vector_resize(long_vector* vec) except -1 nogil:
     new_size = vec.size * GROWTH_RATE
     v = <long*>realloc(vec.v, sizeof(long) * new_size)
     if v == NULL:
-        printf("long_vector_resize returned -1\n")
+        with gil:
+            PyErr_SetString(MemoryError, "long_vector_resize failed")
         return -1
     vec.v = v
     vec.size = new_size
@@ -94,7 +96,8 @@ cdef int long_vector_reserve(long_vector* vec, size_t new_size) except -1 nogil:
         long* v
     v = <long*>realloc(vec.v, sizeof(long) * new_size)
     if v == NULL:
-        printf("long_vector_resize returned -1\n")
+        with gil:
+            PyErr_SetString(MemoryError, "long_vector_reserve failed")
         return -1
     vec.v = v
     vec.size = new_size
@@ -110,6 +113,10 @@ cdef char* LongVector_buffer_type_code = "l"
 @cython.final
 @cython.freelist(512)
 cdef class LongVector(object):
+    """
+    The :class:`LongVector` is a resize-able sequence-like data type storing a C `long`
+    values in a raw array. This array supports the buffer protocol.
+    """
 
     @staticmethod
     cdef LongVector _create(size_t size):
@@ -134,9 +141,6 @@ cdef class LongVector(object):
         """
         Create a new :class:`LongVector` instance, optionally from an iterable of coercable types,
         or an integer to pre-allocate empty capacity.
-
-        The :class:`LongVector` is a resize-able sequence-like data type storing a C `long`
-        values in a raw array. This array supports the buffer protocol.
         """
         cdef:
             size_t n
@@ -221,7 +225,11 @@ cdef class LongVector(object):
         return long_vector_reserve(self.impl, size)
 
     cpdef int fill(self, long value) noexcept nogil:
-        """Fill all unused capacity with `value`"""
+        """
+        Fill all positions with `value`.
+
+        Leaves unused capacity unaffected.
+        """
         cdef:
             size_t i, n
         n = self.size()
@@ -326,7 +334,7 @@ cdef class LongVector(object):
         PyObject_Free(info.shape)
 
 
-    cpdef void qsort(self, bint reverse=False) noexcept nogil:
+    cpdef void sort(self, bint reverse=False) noexcept nogil:
         """Sort the array in-place"""
         if reverse:
             qsort(self.get_data(), self.size(), sizeof(long), compare_value_long_reverse)

@@ -11,6 +11,7 @@ from cpython.sequence cimport (
     PySequence_Fast_GET_ITEM, PySequence_Fast_GET_SIZE)
 from cpython.number cimport PyNumber_Check, PyNumber_AsSsize_t
 from cpython.slice cimport PySlice_GetIndicesEx
+from cpython.exc cimport PyErr_SetString, PyErr_NoMemory
 
 from cpython.float cimport PyFloat_FromDouble, PyFloat_AsDouble
 from libc.math cimport fabs
@@ -65,7 +66,8 @@ cdef int double_vector_resize(double_vector* vec) except -1 nogil:
     new_size = vec.size * GROWTH_RATE
     v = <double*>realloc(vec.v, sizeof(double) * new_size)
     if v == NULL:
-        printf("double_vector_resize returned -1\n")
+        with gil:
+            PyErr_SetString(MemoryError, "double_vector_resize failed")
         return -1
     vec.v = v
     vec.size = new_size
@@ -95,7 +97,8 @@ cdef int double_vector_reserve(double_vector* vec, size_t new_size) except -1 no
         double* v
     v = <double*>realloc(vec.v, sizeof(double) * new_size)
     if v == NULL:
-        printf("double_vector_resize returned -1\n")
+        with gil:
+            PyErr_SetString(MemoryError, "double_vector_reserve failed")
         return -1
     vec.v = v
     vec.size = new_size
@@ -111,6 +114,10 @@ cdef char* DoubleVector_buffer_type_code = "d"
 @cython.final
 @cython.freelist(512)
 cdef class DoubleVector(object):
+    """
+    The :class:`DoubleVector` is a resize-able sequence-like data type storing a C `double`
+    values in a raw array. This array supports the buffer protocol.
+    """
 
     @staticmethod
     cdef DoubleVector _create(size_t size):
@@ -135,9 +142,6 @@ cdef class DoubleVector(object):
         """
         Create a new :class:`DoubleVector` instance, optionally from an iterable of coercable types,
         or an integer to pre-allocate empty capacity.
-
-        The :class:`DoubleVector` is a resize-able sequence-like data type storing a C `double`
-        values in a raw array. This array supports the buffer protocol.
         """
         cdef:
             size_t n
@@ -222,7 +226,11 @@ cdef class DoubleVector(object):
         return double_vector_reserve(self.impl, size)
 
     cpdef int fill(self, double value) noexcept nogil:
-        """Fill all unused capacity with `value`"""
+        """
+        Fill all positions with `value`.
+
+        Leaves unused capacity unaffected.
+        """
         cdef:
             size_t i, n
         n = self.size()
@@ -327,7 +335,7 @@ cdef class DoubleVector(object):
         PyObject_Free(info.shape)
 
 
-    cpdef void qsort(self, bint reverse=False) noexcept nogil:
+    cpdef void sort(self, bint reverse=False) noexcept nogil:
         """Sort the array in-place"""
         if reverse:
             qsort(self.get_data(), self.size(), sizeof(double), compare_value_double_reverse)

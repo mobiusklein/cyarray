@@ -117,6 +117,7 @@ include "src/cyarray/include/ivl.pyx"
     """
 include "src/cyarray/include/ivl.pxd"
 """,
+    sort_fn="compare_value_interval_t", buffer_type_code="NN"
 )
 
 

@@ -54,7 +54,7 @@ cdef class {{title}}Vector(object):
     cpdef int fill(self, {{ctype}} value) noexcept nogil
 
 {% if sort_fn is not none %}
-    cpdef void qsort(self, bint reverse=?) noexcept nogil
+    cpdef void sort(self, bint reverse=?) noexcept nogil
 {%- endif %}
 
     cpdef object _to_python(self, {{ctype}} value)

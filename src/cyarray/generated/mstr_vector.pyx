@@ -11,6 +11,7 @@ from cpython.sequence cimport (
     PySequence_Fast_GET_ITEM, PySequence_Fast_GET_SIZE)
 from cpython.number cimport PyNumber_Check, PyNumber_AsSsize_t
 from cpython.slice cimport PySlice_GetIndicesEx
+from cpython.exc cimport PyErr_SetString, PyErr_NoMemory
 
 
 include "src/cyarray/include/mstr.pyx"
@@ -48,7 +49,8 @@ cdef int mstr_vector_resize(mstr_vector* vec) except -1 nogil:
     new_size = vec.size * GROWTH_RATE
     v = <mstr*>realloc(vec.v, sizeof(mstr) * new_size)
     if v == NULL:
-        printf("mstr_vector_resize returned -1\n")
+        with gil:
+            PyErr_SetString(MemoryError, "mstr_vector_resize failed")
         return -1
     vec.v = v
     vec.size = new_size
@@ -78,7 +80,8 @@ cdef int mstr_vector_reserve(mstr_vector* vec, size_t new_size) except -1 nogil:
         mstr* v
     v = <mstr*>realloc(vec.v, sizeof(mstr) * new_size)
     if v == NULL:
-        printf("mstr_vector_resize returned -1\n")
+        with gil:
+            PyErr_SetString(MemoryError, "mstr_vector_reserve failed")
         return -1
     vec.v = v
     vec.size = new_size
@@ -93,6 +96,10 @@ cdef int mstr_vector_reserve(mstr_vector* vec, size_t new_size) except -1 nogil:
 @cython.final
 @cython.freelist(512)
 cdef class StringVector(object):
+    """
+    The :class:`StringVector` is a resize-able sequence-like data type storing a C `mstr`
+    values in a raw array. 
+    """
 
     @staticmethod
     cdef StringVector _create(size_t size):
@@ -117,9 +124,6 @@ cdef class StringVector(object):
         """
         Create a new :class:`StringVector` instance, optionally from an iterable of coercable types,
         or an integer to pre-allocate empty capacity.
-
-        The :class:`StringVector` is a resize-able sequence-like data type storing a C `mstr`
-        values in a raw array. This array supports the buffer protocol.
         """
         cdef:
             size_t n
@@ -204,7 +208,11 @@ cdef class StringVector(object):
         return mstr_vector_reserve(self.impl, size)
 
     cpdef int fill(self, mstr value) noexcept nogil:
-        """Fill all unused capacity with `value`"""
+        """
+        Fill all positions with `value`.
+
+        Leaves unused capacity unaffected.
+        """
         cdef:
             size_t i, n
         n = self.size()

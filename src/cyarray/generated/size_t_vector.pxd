@@ -54,7 +54,7 @@ cdef class SizeTVector(object):
     cpdef int fill(self, size_t value) noexcept nogil
 
 
-    cpdef void qsort(self, bint reverse=?) noexcept nogil
+    cpdef void sort(self, bint reverse=?) noexcept nogil
 
     cpdef object _to_python(self, size_t value)
     cpdef size_t _to_c(self, object value) except *
