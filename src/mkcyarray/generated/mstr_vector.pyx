@@ -14,7 +14,7 @@ from cpython.slice cimport PySlice_GetIndicesEx
 from cpython.exc cimport PyErr_SetString, PyErr_NoMemory
 
 
-include "src/cyarray/include/mstr.pyx"
+include "src/mkcyarray/include/mstr.pyx"
 
 
 cdef extern from * nogil:

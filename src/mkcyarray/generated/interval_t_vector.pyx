@@ -14,7 +14,7 @@ from cpython.slice cimport PySlice_GetIndicesEx
 from cpython.exc cimport PyErr_SetString, PyErr_NoMemory
 
 
-include "src/cyarray/include/ivl.pyx"
+include "src/mkcyarray/include/ivl.pyx"
 
 
 cdef int compare_value_interval_t_reverse(const void* a, const void* b) noexcept nogil:

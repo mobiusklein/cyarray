@@ -1,6 +1,6 @@
 
 
-include "src/cyarray/include/mstr.pxd"
+include "src/mkcyarray/include/mstr.pxd"
 
 
 cdef struct mstr_vector:

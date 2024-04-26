@@ -21,7 +21,7 @@ cdef int {sort_fn}_reverse(const void* a, const void* b) noexcept nogil:
         sort_fn_reverse = sort_fn + '_reverse'
     pxd_template = jinja2.Template(open("template.pxd", 'rt').read())
     print(title, sort_fn, sort_fn_reverse)
-    with open("src/cyarray/generated/{}_vector.pxd".format(ctype), 'wt') as fh:
+    with open("src/mkcyarray/generated/{}_vector.pxd".format(ctype), "wt") as fh:
         fh.write(pxd_template.render(
             pytype=pytype, ctype=ctype, to_python_func=to_python_func,
             to_c_func=to_c_func, title=title,
@@ -29,7 +29,7 @@ cdef int {sort_fn}_reverse(const void* a, const void* b) noexcept nogil:
             sort_fn_reverse=sort_fn_reverse))
         pxds.append(fh.name)
     pyx_template = jinja2.Template(open("template.pyx", 'rt').read())
-    with open("src/cyarray/generated/{}_vector.pyx".format(ctype), "wt") as fh:
+    with open("src/mkcyarray/generated/{}_vector.pyx".format(ctype), "wt") as fh:
         fh.write(pyx_template.render(
             pytype=pytype, ctype=ctype, to_python_func=to_python_func,
             to_c_func=to_c_func, title=title, implementation_preamble=implementation_preamble,
@@ -112,12 +112,13 @@ fill_in_template(
     "tuple_from_interval",
     "interval_from_tuple",
     """
-include "src/cyarray/include/ivl.pyx"
+include "src/mkcyarray/include/ivl.pyx"
 """,
     """
-include "src/cyarray/include/ivl.pxd"
+include "src/mkcyarray/include/ivl.pxd"
 """,
-    sort_fn="compare_value_interval_t", buffer_type_code="NN"
+    sort_fn="compare_value_interval_t",
+    buffer_type_code="NN",
 )
 
 
@@ -128,14 +129,14 @@ fill_in_template(
     "mstr_as_str",
     "mstr_from_str",
     """
-include "src/cyarray/include/mstr.pyx"
+include "src/mkcyarray/include/mstr.pyx"
 """,
     """
-include "src/cyarray/include/mstr.pxd"
+include "src/mkcyarray/include/mstr.pxd"
 """,
 )
 
-with open("src/cyarray/cyarray.pxd", 'wt') as fh:
+with open("src/mkcyarray/cyarray.pxd", "wt") as fh:
     fh.write("""
 cdef enum VectorStateEnum:
     should_free = 1
@@ -143,6 +144,6 @@ cdef enum VectorStateEnum:
 """)
     for pxd in pxds:
         fh.write("include \"%s\"\n" % pxd)
-with open("src/cyarray/cyarray.pyx", "wt") as fh:
+with open("src/mkcyarray/cyarray.pyx", "wt") as fh:
     for pyx in pyxs:
         fh.write("include \"%s\"\n" % pyx)

@@ -6,14 +6,14 @@ try:
     cython_directives = {
         'embedsignature': True,
     }
-    extensions = cythonize([
-        Extension("cyarray.cyarray", ["src/cyarray/cyarray.pyx"])
-    ])
+    extensions = cythonize(
+        [Extension("mkcyarray.cyarray", ["src/mkcyarray/cyarray.pyx"])]
+    )
 except ImportError:
-    extensions = [Extension("cyarray", ["src/cyarray/cyarray.c"])]
+    extensions = [Extension("mkcyarray.cyarray", ["src/mkcyarray/cyarray.c"])]
 
 setup(
-    name="cyarray",
+    name="mkcyarray",
     version="1.0.0",
     packages=find_packages(where="src"),
     package_dir={"": "src"},

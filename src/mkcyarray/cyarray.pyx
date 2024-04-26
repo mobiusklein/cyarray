@@ -1,0 +1,5 @@
+include "src/mkcyarray/generated/double_vector.pyx"
+include "src/mkcyarray/generated/long_vector.pyx"
+include "src/mkcyarray/generated/size_t_vector.pyx"
+include "src/mkcyarray/generated/interval_t_vector.pyx"
+include "src/mkcyarray/generated/mstr_vector.pyx"
