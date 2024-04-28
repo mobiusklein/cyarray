@@ -14,7 +14,7 @@ except ImportError:
 
 setup(
     name="mkcyarray",
-    version="1.0.0",
+    version="1.0.1",
     packages=find_packages(where="src"),
     package_dir={"": "src"},
     include_package_data=True,
